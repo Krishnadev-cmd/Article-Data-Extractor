@@ -1,0 +1,15 @@
+langchain
+python-dotenv
+streamlit
+unstructured
+tiktoken
+faiss-cpu
+libmagic
+python-magic
+python-magic-bin
+google-generativeai 
+pickle (part of the Python Standard Library)
+os (part of the Python Standard Library)
+langchain_google_genai
+faiss
+sentence-transformers

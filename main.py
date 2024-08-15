@@ -1,20 +1,21 @@
+import os
 import streamlit as st
 import pickle
-import os
+import time
 from langchain_google_genai import GoogleGenerativeAI
 from langchain.chains.qa_with_sources.retrieval import RetrievalQAWithSourcesChain
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.document_loaders import UnstructuredURLLoader
-from langchain.vectorstores import FAISS
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_community.document_loaders import UnstructuredURLLoader
+from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_community.vectorstores import FAISS
+
+# import nltk
+# nltk.download('averaged_perceptron_tagger_eng')
+
 from dotenv import load_dotenv
-from sentence_transformers import SentenceTransformer
-import faiss
-from langchain_community.docstore.in_memory import InMemoryDocstore
-from langchain.docstore.document import Document
-
-load_dotenv()  # Take environment variables from .env (especially google API key)
-
-st.title("News Research Tool")
+load_dotenv()  # take environment variables from .env (especially openai api key)
+api_key = os.getenv('GOOGLE_API_KEY')
+st.title("News Research Tool 📈")
 st.sidebar.title("News Article URLs")
 
 urls = []
@@ -23,67 +24,38 @@ for i in range(3):
     urls.append(url)
 
 process_url_clicked = st.sidebar.button("Process URLs")
-index_file_path = "faiss_index.bin"
-docstore_file_path = "docstore.pkl"
+file_path = "faiss_store_openai.pkl"
 
 main_placeholder = st.empty()
-llm = GoogleGenerativeAI(api_key=os.getenv("GOOGLE_API_KEY"), model="gemini-1.5-pro")
+llm = GoogleGenerativeAI(model='gemini-pro', google_api_key=api_key)
 
 if process_url_clicked:
+    # load data
     loader = UnstructuredURLLoader(urls=urls)
-    main_placeholder.text("Data Loading...Started...")
+    main_placeholder.text("Data Loading...Started...✅✅✅")
     data = loader.load()
+    # split data
+    splitter=RecursiveCharacterTextSplitter(separators=["\n\n","\n",",","."],chunk_size=1000)
+    main_placeholder.text("Text Splitter...Started...✅✅✅")
+    content=splitter.split_documents(data)
+    # create embeddings and save it to FAISS index
+    embeddings = HuggingFaceEmbeddings()
+    vectorstore_openai = FAISS.from_documents(content, embeddings)
+    main_placeholder.text("Embedding Vector Started Building...✅✅✅")
+    time.sleep(2)
 
-    # Split data
-    text_splitter = RecursiveCharacterTextSplitter(separators=['\n\n', '\n', '.', ','], chunk_size=1000)
-    main_placeholder.text("Text Splitting...Started...")
-    docs = text_splitter.split_documents(data)
-
-    for doc in docs:
-        if not isinstance(doc.page_content, str):
-            doc.page_content = str(doc.page_content)
-
-    st.session_state["docs"] = docs
-
-    # Embed documents
-    model = SentenceTransformer('paraphrase-MiniLM-L6-v2')
-    embeddings = model.encode([doc.page_content for doc in docs])
-
-    # Create FAISS index
-    index = faiss.IndexFlatL2(embeddings.shape[1])
-    index.add(embeddings)
-
-    # Create InMemoryDocstore
-    docstore = InMemoryDocstore({str(i): doc for i, doc in enumerate(docs)})
-
-    # Store the FAISS index and document store
-    faiss.write_index(index, index_file_path)
-    with open(docstore_file_path, "wb") as f:
-        pickle.dump(docstore._dict, f)
-    st.sidebar.success("URLs processed and data stored successfully.")
-    main_placeholder.text("Embedding Vectors Built and Indexed.")
+    # Save the FAISS index to a pickle file
+    with open(file_path, "wb") as f:
+        pickle.dump(vectorstore_openai, f)
 
 query = main_placeholder.text_input("Question: ")
 if query:
-    if os.path.exists(index_file_path) and os.path.exists(docstore_file_path):
-        try:
-            # Load FAISS index and document store
-            index = faiss.read_index(index_file_path)
-            with open(docstore_file_path, "rb") as f:
-                docstore_dict = pickle.load(f)
-            docstore = InMemoryDocstore(docstore_dict)
-            st.session_state["docs"] = list(docstore_dict.values())
-
-            # Recreate the SentenceTransformer model
-            model = SentenceTransformer('paraphrase-MiniLM-L6-v2')
-
-            # Create FAISS retriever
-            vectorstore = FAISS(embedding_function=model.encode, index=index, docstore=docstore,
-                                index_to_docstore_id={i: str(i) for i in range(len(st.session_state["docs"]))})
-
+    if os.path.exists(file_path):
+        with open(file_path, "rb") as f:
+            vectorstore = pickle.load(f)
             chain = RetrievalQAWithSourcesChain.from_llm(llm=llm, retriever=vectorstore.as_retriever())
             result = chain({"question": query}, return_only_outputs=True)
-            
+            # result will be a dictionary of this format --> {"answer": "", "sources": [] }
             st.header("Answer")
             st.write(result["answer"])
 
@@ -94,7 +66,3 @@ if query:
                 sources_list = sources.split("\n")  # Split the sources by newline
                 for source in sources_list:
                     st.write(source)
-        except Exception as e:
-            st.error(f"Error retrieving answer: {e}")
-    else:
-        st.error("FAISS store not found. Please process URLs first.")

@@ -47,6 +47,8 @@ To run this application, you need to have Python installed. Follow the steps bel
 2. **Process URLs**: Click the "Process URLs" button to load and process the content.
 3. **Ask Questions**: Enter a query in the text input box and press Enter. The app will display the answer along with the sources.
 
+    ![Screenshot (6)](https://github.com/user-attachments/assets/fdc80023-29f2-448b-8a3e-c3b39ef6a351)
+
 ## Dependencies
 
 - `streamlit`: Used for building the web application.

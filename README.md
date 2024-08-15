@@ -39,6 +39,8 @@ To run this application, you need to have Python installed. Follow the steps bel
     streamlit run app.py
     ```
 
+    ![Screenshot (4)](https://github.com/user-attachments/assets/416b3b0e-7ae2-4b74-bbe1-aab12816dd7c)
+
 ## How to Use
 
 1. **Enter URLs**: In the sidebar, enter up to three URLs of the news articles you want to analyze.
